@@ -1,6 +1,6 @@
 branches:
  only:
-  - master
+  - paramsMac
 
 language: objective-c
 
@@ -25,6 +25,3 @@ install:
  - cd ..
 
 script: SCONS_LIB_DIR=/usr/local/lib/python2.7/site-packages/scons-3.0.1-py2.7.egg/scons-3.0.1 scons version=$version
-
-after_success:
- '(echo "{\"os\": \"mac\", \"version\": \"$version\", \"dmg\": \"$dmg\"}"; cat installer/$dmg) | ssh osara@duralumin.jantrid.net osaraCiHook'
