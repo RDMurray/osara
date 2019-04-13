@@ -19,6 +19,7 @@
 #endif
 #include <WDL/win32_utf8.h>
 #include <WDL/db2val.h>
+#include <WDL/wdltypes.h>
 #include <reaper/reaper_plugin.h>
 #include "osara.h"
 #include "resource.h"
@@ -38,6 +39,8 @@ class Param {
 	Param(): isEditable(false) {
 	}
 
+	virtual ~Param() = default;
+
 	virtual double getValue() = 0;
 	virtual string getValueText(double value) = 0;
 	virtual string getValueForEditing() {
@@ -50,6 +53,7 @@ class Param {
 
 class ParamSource {
 	public:
+	virtual ~ParamSource() = default;
 	virtual string getTitle() = 0;
 	virtual int getParamCount() = 0;
 	virtual string getParamName(int param) = 0;
@@ -272,13 +276,13 @@ class ParamsDialog {
 	string valText;
 
 	void updateValueText() {
+#ifdef _WIN32
 		if (this->valText.empty()) {
 			// No value text.
 			accPropServices->ClearHwndProps(this->slider, OBJID_CLIENT, CHILDID_SELF, &PROPID_ACC_VALUE, 1);
 			return;
 		}
 
-#ifdef _WIN32
 		// Set the slider's accessible value to this text.
 		accPropServices->SetHwndPropStr(this->slider, OBJID_CLIENT, CHILDID_SELF,
 			PROPID_ACC_VALUE, widen(this->valText).c_str());
@@ -319,7 +323,7 @@ class ParamsDialog {
 		// Snap to the next change in value text.
 		// todo: Optimise; perhaps a binary search?
 		for (; this->param->min <= newVal && newVal <= this->param->max; newVal += step) {
-			string& testText = this->param->getValueText(newVal);
+			const string testText = this->param->getValueText(newVal);
 			if (testText.empty())
 				break; // Formatted values not supported.
 			if (testText.compare(this->valText) != 0) {
@@ -418,7 +422,7 @@ class ParamsDialog {
 		if (filter.empty())
 			return true;
 		// Convert param name to lower case for match.
-		transform(name.begin(), name.end(), name.begin(), tolower);
+		transform(name.begin(), name.end(), name.begin(), ::tolower);
 		return name.find(filter) != string::npos;
 	}
 
@@ -433,7 +437,7 @@ class ParamsDialog {
 		int newComboSel = 0;
 		ComboBox_ResetContent(this->paramCombo);
 		for (int p = 0; p < this->paramCount; ++p) {
-			string& name = source->getParamName(p);
+			const string name = source->getParamName(p);
 			if (!this->shouldIncludeParam(name))
 				continue;
 			this->visibleParams.push_back(p);
@@ -765,7 +769,7 @@ void fxParams_begin(ReaperObj* obj, const string& apiPrefix) {
 		MENUITEMINFO itemInfo;
 		itemInfo.cbSize = sizeof(MENUITEMINFO);
 		for (int f = 0; f < fxCount; ++f) {
-			itemInfo.fMask = MIIM_FTYPE | MIIM_ID | MIIM_STRING;
+			itemInfo.fMask = MIIM_TYPE | MIIM_ID;
 			itemInfo.fType = MFT_STRING;
 			itemInfo.wID = fxList[f].first + 1;
 			itemInfo.dwTypeData = (char*)fxList[f].second.c_str();
@@ -801,6 +805,8 @@ void cmdFxParamsFocus(Command* command) {
 			fxParams_begin(take, "TakeFX");
 			break;
 		}
+		default:
+			break;
 	}
 }
 
