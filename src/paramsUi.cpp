@@ -19,6 +19,7 @@
 #endif
 #include <WDL/win32_utf8.h>
 #include <WDL/db2val.h>
+#include <reaper/reaper_plugin.h>
 #include "osara.h"
 #include "resource.h"
 
@@ -256,8 +257,6 @@ class ReaperObjLenParam: public ReaperObjParam {
 
 };
 
-#ifdef _WIN32
-
 class ParamsDialog {
 	private:
 	ParamSource* source;
@@ -270,7 +269,6 @@ class ParamsDialog {
 	vector<int> visibleParams;
 	Param* param;
 	double val;
-	int sliderRange;
 	string valText;
 
 	void updateValueText() {
@@ -280,20 +278,19 @@ class ParamsDialog {
 			return;
 		}
 
+#ifdef _WIN32
 		// Set the slider's accessible value to this text.
-		accPropServices->SetHwndPropStr(slider, OBJID_CLIENT, CHILDID_SELF, PROPID_ACC_VALUE,
-			widen(this->valText).c_str());
+		accPropServices->SetHwndPropStr(this->slider, OBJID_CLIENT, CHILDID_SELF,
+			PROPID_ACC_VALUE, widen(this->valText).c_str());
+		NotifyWinEvent(EVENT_OBJECT_VALUECHANGE, this->slider,
+			OBJID_CLIENT, CHILDID_SELF);
+#else // _WIN32
+		// We can't set the slider's accessible value on Mac.
+		outputMessage(this->valText);
+#endif // _WIN32
 	}
 
 	void updateValue() {
-		double sliderVal = (this->val - this->param->min) / this->param->step;
-		// This should be very close to an integer, but we can get values like 116.999...
-		// Casting to int just truncates the decimal.
-		// Nudge the number a bit to compensate for this.
-		// nearbyint would be better, but MSVC doesn't have this.
-		sliderVal += sliderVal > 0 ? 0.1 : -0.1;
-		SendMessage(this->slider, TBM_SETPOS, TRUE,
-			(int)sliderVal);
 		this->valText = this->param->getValueText(this->val);
 		this->updateValueText();
 		if (this->param->isEditable) {
@@ -307,30 +304,21 @@ class ParamsDialog {
 		int paramNum = this->visibleParams[ComboBox_GetCurSel(this->paramCombo)];
 		this->param = this->source->getParam(paramNum);
 		this->val = this->param->getValue();
-		this->sliderRange = (int)((this->param->max - this->param->min) / this->param->step);
-		SendMessage(this->slider, TBM_SETRANGE, TRUE, MAKELPARAM(0, this->sliderRange));
-		SendMessage(this->slider, TBM_SETLINESIZE, 0, 1);
-		SendMessage(this->slider, TBM_SETPAGESIZE, 0,
-			(int)(this->param->largeStep / this->param->step));
 		EnableWindow(this->valueEdit, this->param->isEditable);
 		this->updateValue();
 	}
 
-	void onSliderChange() {
-		int sliderVal = SendMessage(this->slider, TBM_GETPOS, 0, 0);
-		double newVal = sliderVal * this->param->step + this->param->min;
-		if (newVal == this->val)
-			return; // This is due to our own snapping call (below).
-		int step = (newVal > this->val) ? 1 : -1;
+	void onSliderChange(double newVal) {
+		double step = this->param->step;
+		if (newVal < val) {
+			step = -step;
+		}
 		this->val = newVal;
 
 		// If the value text (if any) doesn't change, the value change is insignificant.
 		// Snap to the next change in value text.
 		// todo: Optimise; perhaps a binary search?
-		for (; 0 <= sliderVal && sliderVal <= this->sliderRange; sliderVal += step) {
-			// Continually adding to a float accumulates inaccuracy,
-			// so calculate the value from scratch each time.
-			newVal = sliderVal * this->param->step + this->param->min;
+		for (; this->param->min <= newVal && newVal <= this->param->max; newVal += step) {
 			string& testText = this->param->getValueText(newVal);
 			if (testText.empty())
 				break; // Formatted values not supported.
@@ -373,12 +361,6 @@ class ParamsDialog {
 					return TRUE;
 				}
 				break;
-			case WM_HSCROLL:
-				if ((HWND)lParam == dialog->slider) {
-					dialog->onSliderChange();
-					return TRUE;
-				}
-				break;
 			case WM_CLOSE:
 				DestroyWindow(dialogHwnd);
 				delete dialog;
@@ -387,9 +369,46 @@ class ParamsDialog {
 		return FALSE;
 	}
 
+	accelerator_register_t accelReg;
+	static int translateAccel(MSG* msg, accelerator_register_t* accelReg) {
+		// We handle key presses for the slider ourselves.
+		ParamsDialog* dialog = (ParamsDialog*)accelReg->user;
+		if (msg->message != WM_KEYDOWN || msg->hwnd != dialog->slider) {
+			return 0;
+		}
+		double newVal = dialog->val;
+		switch (msg->wParam) {
+			case VK_UP:
+			case VK_RIGHT:
+				newVal += dialog->param->step;
+				break;
+			case VK_DOWN:
+			case VK_LEFT:
+				newVal -= dialog->param->step;
+				break;
+			case VK_PRIOR:
+				newVal += dialog->param->largeStep;
+				break;
+			case VK_NEXT:
+				newVal -= dialog->param->largeStep;
+				break;
+			case VK_HOME:
+				newVal = dialog->param->max;
+				break;
+			case VK_END:
+				newVal = dialog->param->min;
+				break;
+			default:
+				return -1;
+		}
+		dialog->onSliderChange(newVal);
+		return 1;
+	}
+
 	public:
 
 	~ParamsDialog() {
+		plugin_register("-accelerator", &this->accelReg);
 		if (this->param)
 			delete this->param;
 		delete this->source;
@@ -453,14 +472,22 @@ class ParamsDialog {
 		this->paramCombo = GetDlgItem(this->dialog, ID_PARAM);
 		WDL_UTF8_HookComboBox(this->paramCombo);
 		this->slider = GetDlgItem(this->dialog, ID_PARAM_VAL_SLIDER);
+		// We need to do exotic stuff with this slider that we can't support on Mac:
+		// 1. Custom step values (TBM_SETLINESIZE, TBM_SETPAGESIZE).
+		// 2. Down arrow moving left instead of right (TBS_DOWNISLEFT).
+		// We also snap to changes in value text, which is even tricky on Windows.
+		// Therefore, we just use the slider as a placeholder and handle key
+		// presses ourselves.
+		this->accelReg.translateAccel = &this->translateAccel;
+		this->accelReg.isLocal = true;
+		this->accelReg.user = (void*)this;
+		plugin_register("accelerator", &this->accelReg);
 		this->valueEdit = GetDlgItem(this->dialog, ID_PARAM_VAL_EDIT);
 		this->updateParamList();
 		ShowWindow(this->dialog, SW_SHOWNORMAL);
 	}
 
 };
-
-#endif
 
 class TrackParams: public ReaperObjParamSource {
 	private:
@@ -558,8 +585,6 @@ class ItemParams: public ReaperObjParamSource {
 
 };
 
-#ifdef _WIN32
-
 void cmdParamsFocus(Command* command) {
 	ParamSource* source;
 	switch (fakeFocus) {
@@ -582,8 +607,6 @@ void cmdParamsFocus(Command* command) {
 	}
 	new ParamsDialog(source);
 }
-
-#endif
 
 // The FX functions in the REAPER API are the same for tracks and takes
 // except for the prefix (TrackFX_*/TakeFX_*)
@@ -686,8 +709,6 @@ Param* FxParams<ReaperObj>::getParam(int param) {
 	return new FxParam<ReaperObj>(*this, param);
 }
 
-#ifdef _WIN32
-
 typedef vector<pair<int, string>> FxList;
 
 FxList listFx(MediaTrack* track) {
@@ -786,5 +807,3 @@ void cmdFxParamsFocus(Command* command) {
 void cmdFxParamsMaster(Command* command) {
 	fxParams_begin(GetMasterTrack(0), "TrackFX");
 }
-
-#endif
