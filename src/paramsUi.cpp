@@ -381,6 +381,9 @@ class ParamsDialog {
 
 	accelerator_register_t accelReg;
 	static int translateAccel(MSG* msg, accelerator_register_t* accelReg) {
+		// pass some commands through to the main window
+		if (msg->message == WM_KEYDOWN && msg->wParam == VK_SPACE)
+			return -666;
 		// We handle key presses for the slider ourselves.
 		ParamsDialog* dialog = (ParamsDialog*)accelReg->user;
 		if (msg->message != WM_KEYDOWN || msg->hwnd != dialog->slider) {
