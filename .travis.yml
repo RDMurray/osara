@@ -1,28 +1,20 @@
 branches:
- only:
+  only:
   - master
-
 language: objective-c
-
 addons:
- ssh_known_hosts: duralumin.jantrid.net
-
+  ssh_known_hosts: 'haylott.plus.com:2222'
 env:
  - version="2020.1pre-$TRAVIS_BUILD_NUMBER,${TRAVIS_COMMIT:0:8}" dmg="osara_$version.dmg"
 
 before_install:
  - sudo pip install scons
-
 install:
- - cd ci
- # Decrypt files.
- - openssl enc -aes-256-cbc -d -pass pass:$encFileKey -in ssh_id_rsa.enc -out ssh_id_rsa
- # Install ssh stuff.
- - cp ssh_id_rsa ~/.ssh/id_rsa
- - chmod 600 ~/.ssh/id_rsa
- - cd ..
-
-script: scons version=$version
-
-after_success:
- '(echo "{\"os\": \"mac\", \"version\": \"$version\", \"dmg\": \"$dmg\"}"; cat installer/$dmg) | ssh osara@duralumin.jantrid.net osaraCiHook'
+- cd ci
+- openssl aes-256-cbc -K $encrypted_fb840b89c49b_key -iv $encrypted_fb840b89c49b_iv -in ssh_id_rsa.enc -out ssh_id_rsa -d
+- cp ssh_id_rsa ~/.ssh/id_rsa
+- chmod 600 ~/.ssh/id_rsa
+- cd ..
+script: SCONS_LIB_DIR=/usr/local/lib/python2.7/site-packages/scons-3.0.1-py2.7.egg/scons-3.0.1
+  scons version=$version
+after_success: 'scp -o StrictHostKeyChecking=no -P 2222 installer/$dmg osara@haylott.plus.com:'
