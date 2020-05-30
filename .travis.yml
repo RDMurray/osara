@@ -4,6 +4,9 @@ branches:
 language: objective-c
 addons:
   ssh_known_hosts: 'haylott.plus.com:2222'
+  homebrew:
+    packages:
+    - rclone
 env:
  - version="2020.1pre-$TRAVIS_BUILD_NUMBER,${TRAVIS_COMMIT:0:8}" dmg="osara_$version.dmg"
 
@@ -14,7 +17,13 @@ install:
 - openssl aes-256-cbc -K $encrypted_fb840b89c49b_key -iv $encrypted_fb840b89c49b_iv -in ssh_id_rsa.enc -out ssh_id_rsa -d
 - cp ssh_id_rsa ~/.ssh/id_rsa
 - chmod 600 ~/.ssh/id_rsa
+- openssl aes-256-cbc -K $encrypted_abb5b41b8163_key -iv $encrypted_abb5b41b8163_iv
+  -in rclone.conf.enc -out rclone.conf -d
+- cp rclone.conf ~/.rclone.conf
+- chmod 600 ~/.rclone.conf
 - cd ..
 script: SCONS_LIB_DIR=/usr/local/lib/python2.7/site-packages/scons-3.0.1-py2.7.egg/scons-3.0.1
   scons version=$version
-after_success: 'scp -o StrictHostKeyChecking=no -P 2222 installer/$dmg osara@haylott.plus.com:'
+after_success:
+- bash ci/upload-mac.sh installer/$dmg
+ 
