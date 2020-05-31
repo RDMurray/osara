@@ -25,5 +25,5 @@ install:
 script: SCONS_LIB_DIR=/usr/local/lib/python2.7/site-packages/scons-3.0.1-py2.7.egg/scons-3.0.1
   scons version=$version
 after_success:
-  script: bash ci/upload-mac.sh installer/$dmg
+  bash ci/upload-mac.sh installer/$dmg
 
