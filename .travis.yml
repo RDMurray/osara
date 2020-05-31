@@ -24,6 +24,6 @@ install:
 - chmod 600 ~/.rclone.conf
 - cd ..
 script: SCONS_LIB_DIR=/usr/local/lib/python2.7/site-packages/scons-3.0.1-py2.7.egg/scons-3.0.1
-  scons version=$version; rclone -v -v copy "$1" dropbox:OSARA\ development/Current\ test\ builds\ and\ proposed\ key\ mappings/Robbie\'s\ test\ builds/Mac/ 
-after_success: "rclone -v -v copy install/$dmg dropbox:OSARA\ development/Current\ test\ builds\ and\ proposed\ key\ mappings/Robbie\'s\ test\ builds/Mac/ "
+  scons version=$version
+after_success: rclone -v -v copy install/$dmg dropbox:OSARA\ development/Current\ test\ builds\ and\ proposed\ key\ mappings/Robbie\'s\ test\ builds/Mac/ 
 
