@@ -2424,6 +2424,9 @@ void cmdToggleSelection(Command* command) {
 		case FOCUS_AUTOMATIONITEM:
 			select = toggleCurrentAutomationItemSelection();
 			break;
+		case FOCUS_ENVELOPE:
+			select = toggleCurrentEnvelopePointSelection();
+			break;
 		default:
 			return;
 	}
