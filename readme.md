@@ -146,6 +146,10 @@ Most of these are actions built into REAPER, but a few are very useful actions f
 - Item properties: Toggle mute: Control+F5
 - Item properties: Toggle solo exclusive: Control+F6
 - Item: Open associated project in new tab
+- Item: Nudge items volume +1dB
+- Item: Nudge items volume -1dB
+- Xenakios/SWS: Nudge item volume down
+- Xenakios/SWS: Nudge item volume up
 
 #### Takes
 - Take: Switch items to next take: T
@@ -154,6 +158,10 @@ Most of these are actions built into REAPER, but a few are very useful actions f
 - Item properties: Set take channel mode to mono (left): Shift+F6
 - Item properties: Set take channel mode to mono (downmix): Shift+F7
 - Item properties: Set take channel mode to mono (right): Shift+F8
+- Take: Nudge active takes volume +1dB
+- Take: Nudge active takes volume -1dB
+- Xenakios/SWS: Nudge active take volume down
+- Xenakios/SWS: Nudge active take volume up
 
 #### Markers and Regions
 - Markers: Go to previous marker/project start: ;
