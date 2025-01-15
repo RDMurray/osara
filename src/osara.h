@@ -221,6 +221,7 @@
 #define REAPERAPI_WANT_parse_timestr_len
 #define REAPERAPI_WANT_TimeMap_GetTimeSigAtTime
 #define REAPERAPI_WANT_GetSetProjectGrid
+#define REAPERAPI_WANT_MIDI_GetScale
 
 #include <reaper/reaper_plugin.h>
 #include <reaper/reaper_plugin_functions.h>

@@ -575,7 +575,10 @@ class MidiEventIterator {
 
 using MidiNoteIterator = MidiEventIterator<MidiNote, MediaItem_Take*>;
 
-const string getMidiNoteName(MediaTrack* track, int pitch, int channel) {
+const string getNoteName(int note){
+	if(note < 0 || note > 11) {
+		return "";
+	}
 	static const char* names[] = {
 		// Translators: The name of a musical note.
 		translate("c"),
@@ -602,6 +605,10 @@ const string getMidiNoteName(MediaTrack* track, int pitch, int channel) {
 		// Translators: The name of a musical note.
 		translate("b")
 	};
+	return names[note];
+}
+
+const string getMidiNoteName(MediaTrack* track, int pitch, int channel) {
 	int tracknumber = static_cast<int> (GetMediaTrackInfo_Value(track, "IP_TRACKNUMBER")); // one based
 	const char* noteName = GetTrackMIDINoteName(tracknumber - 1, pitch, channel); // track number is zero based
 	ostringstream s;
@@ -615,7 +622,7 @@ const string getMidiNoteName(MediaTrack* track, int pitch, int channel) {
 			octave += *octaveOffset - 1; // REAPER offset "0" is saved as "1" in the preferences file.
 		}
 		pitch %= 12;
-		s << names[pitch] << " " << octave;
+		s << getNoteName(pitch) << " " << octave;
 	}
 	return s.str();
 }
@@ -2323,4 +2330,16 @@ void postMidiChangeZoom(int command) {
 		// replaced with the number of pixels per second; e.g. 100 pixels/second.
 		outputMessage(format(translate("{} pixels/second"), formatDouble(zoom, 1)));
 	}
+}
+
+void postMidiChangeKeySig(int command) {
+	HWND editor = MIDIEditor_GetActive();
+	MediaItem_Take* take = MIDIEditor_GetTake(MIDIEditor_GetActive());
+	if(!take) {
+		return;
+	}
+	int root;
+	char scaleName[64];
+	MIDI_GetScale(take, &root, nullptr, scaleName, 64);
+	outputMessage(format("{} {}",getNoteName(root), scaleName));
 }
